@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="projections_time_spans">
+        <item>1 year</item>
+        <item>10 years</item>
+        <item>100 years</item>
+    </string-array>
+</resources>
