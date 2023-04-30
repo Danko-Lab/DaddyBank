@@ -1,5 +1,7 @@
 package com.example.daddybank
 
+import java.text.SimpleDateFormat
+import java.util.concurrent.TimeUnit
 import retrofit2.Call
 import retrofit2.http.GET
 import android.content.Context
@@ -10,9 +12,12 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.lang.Exception
 import java.io.Serializable
+import java.util.*
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.collections.ArrayList
+
 
 data class BankData(val users: List<User>)
 
@@ -89,5 +94,61 @@ class BankDataRepository(context: Context) : Serializable {
         sharedPreferences.edit().putString("users", json).apply()
     }
 
+    fun getBalance(user: User, currentDate: String): Double {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val current = sdf.parse(currentDate) ?: return 0.0
+
+        var balance = 0.0
+        for (transaction in user.transactions) {
+            val date = sdf.parse(transaction.date) ?: continue
+            if (date <= current) {
+                balance += if (transaction.type == "deposit") transaction.amount else -transaction.amount
+            }
+        }
+
+        val sortedInterestRates = user.interestRates.sortedBy { it.startDate }
+        var lastInterestRateDate = sdf.parse(sortedInterestRates.first().startDate) ?: return balance
+
+        for (interestRate in sortedInterestRates) {
+            val start = sdf.parse(interestRate.startDate) ?: continue
+            val end = sdf.parse(interestRate.endDate) ?: continue
+
+            if (start <= current) {
+                val interestDays = if (current < end) {
+                    TimeUnit.MILLISECONDS.toDays(current.time - lastInterestRateDate.time)
+                } else {
+                    TimeUnit.MILLISECONDS.toDays(end.time - lastInterestRateDate.time)
+                }
+
+                balance += balance * interestRate.rate * interestDays / 365.0
+                lastInterestRateDate = end
+            }
+        }
+
+        return balance
+    }
+
+    fun getAccountValuesSeries(user: User, startDate: String, endDate: String): List<Pair<String, Double>> {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val start = sdf.parse(startDate) ?: return emptyList()
+        val end = sdf.parse(endDate) ?: return emptyList()
+
+        val dateRange = mutableListOf<String>()
+        val calendar = Calendar.getInstance()
+        calendar.time = start
+
+        while (calendar.time <= end) {
+            dateRange.add(sdf.format(calendar.time))
+            calendar.add(Calendar.DATE, 1)
+        }
+
+        val accountValuesSeries = ArrayList<Pair<String, Double>>(dateRange.size)
+        for (date in dateRange) {
+            val balance = getBalance(user, date)
+            accountValuesSeries.add(Pair(date, balance))
+        }
+
+        return accountValuesSeries
+    }
 
 }
