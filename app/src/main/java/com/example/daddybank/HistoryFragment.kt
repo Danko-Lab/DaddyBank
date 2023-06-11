@@ -11,10 +11,14 @@ import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import com.github.mikephil.charting.components.XAxis
+import androidx.fragment.app.viewModels
 
 class HistoryFragment : Fragment() {
 
+    private val sharedViewModel: SharedViewModel by viewModels({ requireActivity() })
+
     private lateinit var historyLineChart: LineChart
+    private lateinit var bankDataRepository: BankDataRepository
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -26,20 +30,25 @@ class HistoryFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        bankDataRepository = arguments?.getSerializable(BANK_DATA_REPOSITORY) as BankDataRepository
+
         historyLineChart = view.findViewById(R.id.history_line_chart)
 
-        // Example data, replace with real data from the XML file
-        val historyData = listOf(
-            Entry(0f, 1000f),
-            Entry(1f, 1100f),
-            Entry(2f, 1300f),
-            Entry(3f, 1500f)
-        )
+        sharedViewModel.selectedUser.observe(viewLifecycleOwner, { user ->
+            if (user != null) {
+                val accountValuesSeries = bankDataRepository.getAccountValuesSeries(user)
 
-        // Example date labels corresponding to the data points in historyData
-        val dateLabels = listOf("2023-01-01", "2023-02-01", "2023-03-01", "2023-04-01")
+                // Prepare data and labels for the chart
+                val historyData = accountValuesSeries.mapIndexed { index, dataPoint ->
+                    Entry(index.toFloat(), dataPoint.second.toFloat())
+                }
+                val dateLabels = accountValuesSeries.map { it.first }
 
-        setupHistoryChart(historyData, dateLabels)
+                setupHistoryChart(historyData, dateLabels)
+            } else {
+                // Handle the case when the user is not found or selected
+            }
+            })
     }
 
     private fun setupHistoryChart(data: List<Entry>, dateLabels: List<String>) {
@@ -73,7 +82,14 @@ class HistoryFragment : Fragment() {
     }
 
     companion object {
-        @JvmStatic
-        fun newInstance() = HistoryFragment()
+        private const val BANK_DATA_REPOSITORY = "bank_data_repository"
+
+        fun newInstance(bankDataRepository: BankDataRepository): HistoryFragment {
+            val fragment = HistoryFragment()
+            val args = Bundle()
+            args.putSerializable(BANK_DATA_REPOSITORY, bankDataRepository)
+            fragment.arguments = args
+            return fragment
+        }
     }
 }

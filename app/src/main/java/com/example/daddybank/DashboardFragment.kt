@@ -8,8 +8,10 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import android.util.Log
+import androidx.fragment.app.viewModels
 
 class DashboardFragment : Fragment() {
+    private val sharedViewModel: SharedViewModel by viewModels({ requireActivity() })
 
     private lateinit var balanceTextView: TextView
     private lateinit var historyButton: Button
@@ -34,7 +36,8 @@ class DashboardFragment : Fragment() {
         exploreButton = view.findViewById(R.id.explore_button)
 
         // Set the current principal balance (replace this with actual balance from dbstatefile.xml)
-        balanceTextView.text = getString(R.string.current_balance, 1000.00)
+        val currentBalance = sharedViewModel.accountValuesSeries.value?.last()?.second ?: 0.0
+        balanceTextView.text = getString(R.string.current_balance, currentBalance)
 
         historyButton.setOnClickListener {
             (activity as MainActivity).navigateToHistory()

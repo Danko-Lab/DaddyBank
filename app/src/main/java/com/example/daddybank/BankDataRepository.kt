@@ -48,6 +48,7 @@ class BankDataRepository(context: Context) : Serializable {
         private set
 
     suspend fun loadData() {
+        Log.d("BankDataRepository", "loadData called")
         val cachedUsers = getCachedUsers()
         if (cachedUsers.isNotEmpty()) {
             users = cachedUsers
@@ -57,6 +58,7 @@ class BankDataRepository(context: Context) : Serializable {
                 users = result.getOrNull().orEmpty()
             }
         }
+        Log.d("BankDataRepository", "loadData completed, users: $users")
     }
 
     suspend fun fetchUsers(): Result<List<User>> {
@@ -66,6 +68,7 @@ class BankDataRepository(context: Context) : Serializable {
                 if (response.isSuccessful) {
                     response.body()?.let { bankData ->
                         saveUsers(bankData.users)
+                        Log.d("BankDataRepository", "Fetched and saved users: ${bankData.users}")
                         Result.success(bankData.users)
                     } ?: Result.failure(Exception("Invalid response"))
                 } else {
@@ -94,61 +97,64 @@ class BankDataRepository(context: Context) : Serializable {
         sharedPreferences.edit().putString("users", json).apply()
     }
 
-    fun getBalance(user: User, currentDate: String): Double {
+    fun getAccountValuesSeries(user: User): List<Pair<String, Double>> {
+        Log.d("BankDataRepository", "Starting BankDataRepository")
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val current = sdf.parse(currentDate) ?: return 0.0
 
-        var balance = 0.0
-        for (transaction in user.transactions) {
-            val date = sdf.parse(transaction.date) ?: continue
-            if (date <= current) {
-                balance += if (transaction.type == "deposit") transaction.amount else -transaction.amount
+        // Create a list of all events (transactions and interest rate changes), each with a date and an action
+        val events = mutableListOf<Event>()
+
+        // Add transactions to the list
+        user.transactions.forEach { transaction ->
+            val date = sdf.parse(transaction.date) ?: return@forEach
+            val action: (Double) -> Double = if (transaction.type == "deposit") {
+                { balance -> balance + transaction.amount }
+            } else {
+                { balance -> balance - transaction.amount }
             }
+            events.add(Event(date, action))
         }
 
-        val sortedInterestRates = user.interestRates.sortedBy { it.startDate }
-        var lastInterestRateDate = sdf.parse(sortedInterestRates.first().startDate) ?: return balance
+        // Add interest rate changes to the list
+        user.interestRates.forEach { interestRate ->
+            val startDate = sdf.parse(interestRate.startDate) ?: return@forEach
+            val endDate = sdf.parse(interestRate.endDate) ?: return@forEach
+            val action: (Double) -> Double = { balance -> balance * (1 + interestRate.rate / 365.0) }
+            events.add(Event(startDate, action))
 
-        for (interestRate in sortedInterestRates) {
-            val start = sdf.parse(interestRate.startDate) ?: continue
-            val end = sdf.parse(interestRate.endDate) ?: continue
-
-            if (start <= current) {
-                val interestDays = if (current < end) {
-                    TimeUnit.MILLISECONDS.toDays(current.time - lastInterestRateDate.time)
-                } else {
-                    TimeUnit.MILLISECONDS.toDays(end.time - lastInterestRateDate.time)
-                }
-
-                balance += balance * interestRate.rate * interestDays / 365.0
-                lastInterestRateDate = end
-            }
-        }
-
-        return balance
-    }
-
-    fun getAccountValuesSeries(user: User, startDate: String, endDate: String): List<Pair<String, Double>> {
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val start = sdf.parse(startDate) ?: return emptyList()
-        val end = sdf.parse(endDate) ?: return emptyList()
-
-        val dateRange = mutableListOf<String>()
-        val calendar = Calendar.getInstance()
-        calendar.time = start
-
-        while (calendar.time <= end) {
-            dateRange.add(sdf.format(calendar.time))
+            val calendar = Calendar.getInstance()
+            calendar.time = endDate
             calendar.add(Calendar.DATE, 1)
+            events.add(Event(calendar.time, { balance -> balance / (1 + interestRate.rate / 365.0) }))
         }
 
-        val accountValuesSeries = ArrayList<Pair<String, Double>>(dateRange.size)
-        for (date in dateRange) {
-            val balance = getBalance(user, date)
-            accountValuesSeries.add(Pair(date, balance))
+        // Sort the events by date
+        events.sortBy { it.date }
+
+        // Calculate the balance incrementally
+        val accountValuesSeries = mutableListOf<Pair<String, Double>>()
+        var balance = 0.0
+        val calendar = Calendar.getInstance()
+        calendar.time = events.first().date
+        events.forEach { event ->
+            while (calendar.time < event.date) {
+                accountValuesSeries.add(Pair(sdf.format(calendar.time), balance))
+                calendar.add(Calendar.DATE, 1)
+            }
+            balance = event.action(balance)
+            Log.d("BankDataRepository", "Event date: ${sdf.format(event.date)}, Balance: $balance")
+        }
+
+        // Continue adding daily balances until today
+        val today = Calendar.getInstance().time
+        while (calendar.time <= today) {
+            accountValuesSeries.add(Pair(sdf.format(calendar.time), balance))
+            calendar.add(Calendar.DATE, 1)
         }
 
         return accountValuesSeries
     }
+
+    data class Event(val date: Date, val action: (Double) -> Double)
 
 }
