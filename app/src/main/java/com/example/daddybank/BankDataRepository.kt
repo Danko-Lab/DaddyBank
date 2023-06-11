@@ -16,6 +16,7 @@ import java.util.*
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.pow
 
 data class BankData(val users: List<User>)
 
@@ -110,20 +111,20 @@ class BankDataRepository(context: Context) : Serializable {
             } else {
                 { balance -> balance - transaction.amount }
             }
-            events.add(Event(date, action))
+            events.add(Event(date, action, null))
         }
 
         // Add interest rate changes to the list
         user.interestRates.forEach { interestRate ->
             val startDate = sdf.parse(interestRate.startDate) ?: return@forEach
-            val endDate = sdf.parse(interestRate.endDate) ?: return@forEach
-            val action: (Double) -> Double = { balance -> balance * (1 + interestRate.rate / 365.0) }
-            events.add(Event(startDate, action))
+            val action: (Double) -> Double = { balance -> balance }
+            events.add(Event(startDate, action, interestRate.rate))
 
+            val endDate = sdf.parse(interestRate.endDate) ?: return@forEach
             val calendar = Calendar.getInstance()
             calendar.time = endDate
             calendar.add(Calendar.DATE, 1)
-            events.add(Event(calendar.time, { balance -> balance / (1 + interestRate.rate / 365.0) }))
+            events.add(Event(calendar.time, action, null))
         }
 
         // Sort the events by date
@@ -132,27 +133,40 @@ class BankDataRepository(context: Context) : Serializable {
         // Calculate the balance incrementally
         val accountValuesSeries = mutableListOf<Pair<String, Double>>()
         var balance = 0.0
+        var currentInterestRate = 0.0
         val calendar = Calendar.getInstance()
         calendar.time = events.first().date
-        events.forEach { event ->
+        for (i in 0 until events.size) {
+            val event = events[i]
             while (calendar.time < event.date) {
+                balance *= (1 + currentInterestRate / 365.0)
                 accountValuesSeries.add(Pair(sdf.format(calendar.time), balance))
                 calendar.add(Calendar.DATE, 1)
             }
+
             balance = event.action(balance)
-            Log.d("BankDataRepository", "Event date: ${sdf.format(event.date)}, Balance: $balance")
+            if (event.interestRate != null) {
+                currentInterestRate = event.interestRate
+            }
+
+            // Log event details and current balance
+            Log.d("BankDataRepository", "Processing event on ${sdf.format(event.date)}, Balance after event: $balance, Current Interest Rate: $currentInterestRate")
         }
 
-        // Continue adding daily balances until today
+        // Handle the final event
         val today = Calendar.getInstance().time
         while (calendar.time <= today) {
+            balance *= (1 + currentInterestRate / 365.0)
             accountValuesSeries.add(Pair(sdf.format(calendar.time), balance))
             calendar.add(Calendar.DATE, 1)
         }
 
+        Log.d("BankDataRepository", "Final Balance: $balance")
+
         return accountValuesSeries
     }
 
-    data class Event(val date: Date, val action: (Double) -> Double)
+
+    class Event(val date: Date, val action: (Double) -> Double, val interestRate: Double?)
 
 }
