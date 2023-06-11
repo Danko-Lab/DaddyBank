@@ -7,6 +7,9 @@ import androidx.fragment.app.commit
 import kotlinx.coroutines.*
 import androidx.activity.viewModels
 import android.app.AlertDialog
+import android.widget.ProgressBar
+import android.widget.TextView
+import android.view.View
 
 class MainActivity : AppCompatActivity() {
     private lateinit var bankDataRepository: BankDataRepository
@@ -20,6 +23,10 @@ class MainActivity : AppCompatActivity() {
         bankDataRepository = BankDataRepository(this)
 
         // Show a loading indicator here
+        val progressBar = findViewById<ProgressBar>(R.id.progress_bar)
+        val loadingText = findViewById<TextView>(R.id.loading_text)
+        progressBar.visibility = View.VISIBLE
+        loadingText.visibility = View.VISIBLE
 
         // Fetch users and handle the result
         coroutineScope.launch {
@@ -41,6 +48,8 @@ class MainActivity : AppCompatActivity() {
             }
 
             // Hide the loading indicator here
+            progressBar.visibility = View.GONE
+            loadingText.visibility = View.GONE
         }
     }
 

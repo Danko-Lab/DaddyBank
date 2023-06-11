@@ -16,8 +16,6 @@ import java.util.*
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.collections.ArrayList
-
 
 data class BankData(val users: List<User>)
 
