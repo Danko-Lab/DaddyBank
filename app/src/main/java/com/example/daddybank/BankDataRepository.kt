@@ -144,7 +144,10 @@ class BankDataRepository(context: Context) : Serializable {
                 calendar.add(Calendar.DATE, 1)
             }
 
+            // Update the current balance (if required).
             balance = event.action(balance)
+
+            // Update the current interest rate (if required).
             if (event.interestRate != null) {
                 currentInterestRate = event.interestRate
             }
