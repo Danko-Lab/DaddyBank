@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
@@ -15,6 +16,8 @@ import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.components.XAxis
 
 class ExploreFragment : Fragment() {
+
+    private val sharedViewModel: SharedViewModel by viewModels({ requireActivity() })
 
     private lateinit var exploreLineChart: LineChart
     private lateinit var interestRateInput: EditText
@@ -55,8 +58,8 @@ class ExploreFragment : Fragment() {
         })
 
         // Example data, replace with real data from the XML file
-        val currentInterestRate = 0.05
-        val currentPrincipal = 1000.0
+        val currentInterestRate = sharedViewModel.currentInterestRate.value ?: 0.0 // Use interest rate from SharedViewModel
+        val currentPrincipal = sharedViewModel.accountValuesSeries.value?.last()?.second ?: 0.0
         val projectionYears = 10
 
         interestRateInput.setText(currentInterestRate.toString())

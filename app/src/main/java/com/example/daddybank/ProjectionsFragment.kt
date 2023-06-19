@@ -13,9 +13,11 @@ import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import android.util.Log
+import androidx.fragment.app.viewModels
 import com.github.mikephil.charting.components.XAxis
 
 class ProjectionsFragment : Fragment() {
+    private val sharedViewModel: SharedViewModel by viewModels({ requireActivity() })
 
     private lateinit var projectionsLineChart: LineChart
     private lateinit var yearsSpinner: Spinner
@@ -52,8 +54,8 @@ class ProjectionsFragment : Fragment() {
     }
 
     private fun updateChart() {
-        val interestRate = 0.05 // Example interest rate, replace with real value from the XML file
-        val principal = 1000.0 // Example principal, replace with real value from the XML file
+        val interestRate = sharedViewModel.currentInterestRate.value ?: 0.0 // Use interest rate from SharedViewModel
+        val principal = sharedViewModel.accountValuesSeries.value?.last()?.second ?: 0.0
         val selectedItem = "\\d+".toRegex().find(yearsSpinner.selectedItem.toString())?.value?.toInt() ?: 1 //yearsSpinner.selectedItem.toString().toInt()
 
         Log.d("ProjectionsFragment", "Selected years: $selectedItem")

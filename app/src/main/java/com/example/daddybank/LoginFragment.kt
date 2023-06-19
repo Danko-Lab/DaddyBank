@@ -53,6 +53,13 @@ class LoginFragment : Fragment() {
             Log.d("LoginFragment", "Selected user: $selectedUser")
             sharedViewModel.selectedUser.value = selectedUser
 
+            // Update the current interest rate
+            selectedUser?.let {
+                val currentInterestRate = bankDataRepository.getCurrentInterestRate(it)
+                Log.d("LoginFragment", "Current interest rate: $currentInterestRate")
+                sharedViewModel.currentInterestRate.value = currentInterestRate
+            }
+
             // Update the account values series
             selectedUser?.let {
                 val series = bankDataRepository.getAccountValuesSeries(it)

@@ -169,6 +169,27 @@ class BankDataRepository(context: Context) : Serializable {
         return accountValuesSeries
     }
 
+    fun getCurrentInterestRate(user: User): Double {
+        Log.d("BankDataRepository", "Retrieving current interest rate for ${user.name}")
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val today = Calendar.getInstance().time
+
+        // Initialize currentInterestRate as 0.0
+        var currentInterestRate = 0.0
+
+        // Iterate over interestRates of the user
+        user.interestRates.forEach { interestRate ->
+            val endDate = sdf.parse(interestRate.endDate) ?: return@forEach
+
+            // If endDate of the current interest rate is before today, then update currentInterestRate
+            if (endDate.before(today) || endDate.equals(today)) {
+                currentInterestRate = interestRate.rate
+            }
+        }
+
+        Log.d("BankDataRepository", "Current interest rate for ${user.name}: $currentInterestRate")
+        return currentInterestRate
+    }
 
     class Event(val date: Date, val action: (Double) -> Double, val interestRate: Double?)
 

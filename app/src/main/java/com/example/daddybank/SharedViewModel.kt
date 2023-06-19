@@ -6,4 +6,5 @@ import androidx.lifecycle.ViewModel
 class SharedViewModel : ViewModel() {
     val selectedUser = MutableLiveData<User?>()
     val accountValuesSeries = MutableLiveData<List<Pair<String, Double>>>()
+    val currentInterestRate = MutableLiveData<Double?>()
 }
