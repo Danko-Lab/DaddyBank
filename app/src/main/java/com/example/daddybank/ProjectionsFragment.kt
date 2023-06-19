@@ -12,9 +12,11 @@ import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.formatter.ValueFormatter
 import android.util.Log
 import androidx.fragment.app.viewModels
 import com.github.mikephil.charting.components.XAxis
+import kotlin.math.roundToInt
 
 class ProjectionsFragment : Fragment() {
     private val sharedViewModel: SharedViewModel by viewModels({ requireActivity() })
@@ -64,11 +66,13 @@ class ProjectionsFragment : Fragment() {
         setupProjectionChart(projectionData)
     }
 
-    private fun generateProjectionData(interestRate: Double, principal: Double, years: Int): List<Entry> {
+    private fun generateProjectionData(interestRate: Double, initialPrincipal: Double, years: Int): List<Entry> {
         val data = mutableListOf<Entry>()
-        for (i in 0..years) {
-            val futureValue = principal * Math.pow(1 + interestRate, i.toDouble())
-            data.add(Entry(i.toFloat(), futureValue.toFloat()))
+        val totalDays = years * 365
+        var principal = initialPrincipal
+        for (i in 0..totalDays) {
+            principal *= 1 + interestRate / 365.0
+            data.add(Entry(i.toFloat(), principal.toFloat()))
         }
         return data
     }
@@ -87,9 +91,21 @@ class ProjectionsFragment : Fragment() {
                 setDrawGridLines(false)
                 setDrawAxisLine(true)
                 axisLineWidth = 2f
-                setLabelCount(data.size, true)
+                // Check the range of x values, if more than 365 days (1 year), set labels to 11 (0 to 10)
+                // If not, adjust to the range of the data
+                val range = if(data.last().x > 365) 11 else 3
+                setLabelCount(range, true)
+                granularity = 1f // Set the minimum interval between the axis values
                 textSize = 14f
                 setLabelRotationAngle(-45f)
+
+                // Set the value formatter to display years instead of days
+                valueFormatter = object : ValueFormatter() {
+                    override fun getFormattedValue(value: Float): String {
+                        // If the last x value is more than 365 days, round to integer. If not, keep the decimal representation.
+                        return if(data.last().x > 365) (value / 365).roundToInt().toString() else (value / 365).toString()
+                    }
+                }
             }
             axisLeft.apply {
                 setDrawGridLines(false)
@@ -98,8 +114,13 @@ class ProjectionsFragment : Fragment() {
                 textSize = 14f
             }
             axisRight.isEnabled = false
-            description.isEnabled = false
+            description.text = "Years (X-axis) / Dollars (Y-axis)"
+            description.textSize = 14f
+            description.setPosition(1f, 1f)
+            description.isEnabled = true
             legend.isEnabled = false
+            // Set extra offsets to prevent labels from being cut off
+            setExtraOffsets(10f, 0f, 10f, 10f)
             invalidate()
         }
     }

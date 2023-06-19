@@ -14,6 +14,8 @@ import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.components.XAxis
+import com.github.mikephil.charting.formatter.ValueFormatter
+import kotlin.math.roundToInt
 
 class ExploreFragment : Fragment() {
 
@@ -77,41 +79,60 @@ class ExploreFragment : Fragment() {
         setupProjectionChart(projectionData)
     }
 
-    private fun generateProjectionData(interestRate: Double, principal: Double, years: Int): List<Entry> {
+    private fun generateProjectionData(interestRate: Double, initialPrincipal: Double, years: Int): List<Entry> {
         val data = mutableListOf<Entry>()
-        for (i in 0..years) {
-            val futureValue = principal * Math.pow(1 + interestRate, i.toDouble())
-            data.add(Entry(i.toFloat(), futureValue.toFloat()))
+        val totalDays = years * 365
+        var principal = initialPrincipal
+        for (i in 0..totalDays) {
+            principal *= 1 + interestRate / 365.0
+            data.add(Entry(i.toFloat(), principal.toFloat()))
         }
         return data
     }
 
     private fun setupProjectionChart(data: List<Entry>) {
-        val lineDataSet = LineDataSet(data, "Projected Principal Balance")
+        val lineDataSet = LineDataSet(data, "Projected Principal Balance").apply {
+            valueTextSize = 12f
+            lineWidth = 3f
+        }
         val lineData = LineData(lineDataSet)
 
         exploreLineChart.apply {
             this.data = lineData
             xAxis.apply {
-                position = XAxis.XAxisPosition.BOTTOM // Set the X axis position to bottom
-                setDrawLabels(true)
-                textSize = 12f // Increase the text size for the X axis labels
+                position = XAxis.XAxisPosition.BOTTOM
                 setDrawGridLines(false)
-                setDrawAxisLine(true) // Draw the X axis line
+                setDrawAxisLine(true)
+                axisLineWidth = 2f
+                val range = if(data.last().x > 365) 11 else 3
+                setLabelCount(range, true)
+                granularity = 1f
+                textSize = 14f
+                setLabelRotationAngle(-45f)
+
+                valueFormatter = object : ValueFormatter() {
+                    override fun getFormattedValue(value: Float): String {
+                        return if(data.last().x > 365) (value / 365).roundToInt().toString() else (value / 365).toString()
+                    }
+                }
             }
             axisLeft.apply {
-                setDrawLabels(true)
-                textSize = 12f // Increase the text size for the Y axis labels
                 setDrawGridLines(false)
-                setDrawAxisLine(true) // Draw the Y axis line
+                setDrawAxisLine(true)
+                axisLineWidth = 2f
+                textSize = 14f
             }
             axisRight.isEnabled = false
-            description.isEnabled = false
+            description.text = "Years (X-axis) / Dollars (Y-axis)"
+            description.textSize = 14f
+            description.setPosition(1f, 1f)
+            description.isEnabled = true
             legend.isEnabled = false
-            setDrawBorders(true) // Draw borders around the chart
+            setExtraOffsets(10f, 0f, 10f, 10f)
             invalidate()
         }
     }
+
 
     companion object {
         @JvmStatic
